@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Frogger Game</title>
+    <link rel="stylesheet" href="style.css" />
+    <style>
+      /* NAVBAR */
+      .navbar {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        padding: 14px 20px;
+        background: linear-gradient(
+          90deg,
+          #2ecc71 0%,
+          #27ae60 50%,
+          #16a085 100%
+        );
+        color: #fff;
+        box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18);
+        position: sticky;
+        top: 0;
+        z-index: 999;
+        border-bottom: 2px solid rgba(255, 255, 255, 0.08);
+        backdrop-filter: blur(6px);
+      }
+
+      .navbar h1 {
+        margin: 0;
+        font-weight: 700;
+        font-size: 1.35rem;
+        letter-spacing: 0.6px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .navbar .badge {
+        background: rgba(255, 255, 255, 0.12);
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+        color: #fff;
+        box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+      }
+
+      /* FOOTER */
+      .footer {
+        text-align: center;
+        padding: 14px 18px;
+        margin-top: 18px;
+        background: linear-gradient(180deg, #f7f9fb 0%, #eef3f5 100%);
+        color: #333;
+        border-top: 1px solid #e0e6e9;
+        box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.04);
+        font-size: 0.95rem;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .footer p {
+        margin: 0;
+        opacity: 0.95;
+      }
+
+      .footer .small {
+        font-size: 0.85rem;
+        color: #6b7280;
+      }
+
+      /* Responsive tweaks */
+      @media (max-width: 600px) {
+        .navbar {
+          padding: 10px 12px;
+        }
+        .navbar h1 {
+          font-size: 1rem;
+        }
+        .navbar .badge {
+          display: none;
+        }
+        .footer {
+          padding: 12px;
+          font-size: 0.88rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav class="navbar" role="navigation" aria-label="Main Navigation">
+      <h1>
+        <span aria-hidden="true">🐸</span>
+        FROGGER
+        <span class="badge">Play & Stay Safe</span>
+        <span aria-hidden="true">🐸</span>
+      </h1>
+    </nav>
+
+    <div class="game-container">
+      <div class="game-wrapper">
+        <div class="game-info">
+          <div>Score: <span id="score">0</span></div>
+          <div>Lives: <span id="lives">3</span></div>
+          <div>Level: <span id="level">1</span></div>
+        </div>
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        <div class="controls">
+          Use arrow keys to move the frog. Avoid cars, use logs to cross the
+          river!
+        </div>
+      </div>
+    </div>
+
+    <div class="game-over" id="gameOver">
+      <h2>Game Over!</h2>
+      <p>Final Score: <span id="finalScore">0</span></p>
+      <button onclick="restartGame()">Play Again</button>
+    </div>
+
+    <div class="game-win" id="gameWin">
+      <h2>Level Complete!</h2>
+      <p>Score: <span id="winScore">0</span></p>
+      <button onclick="nextLevel()">Next Level</button>
+    </div>
+
+    <footer class="footer">
+      <p>© 2024 Frogger Game</p>
+      <span class="small"
+        >Use arrow keys to navigate and reach the other side safely!</span
+      >
+    </footer>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+
+      // Game state
+      let gameState = "playing"; // 'playing', 'gameOver', 'levelComplete'
+      let score = 0;
+      let lives = 3;
+      let level = 1;
+
+      // Player
+      const player = {
+        x: 375,
+        y: 550,
+        width: 30,
+        height: 30,
+        speed: 40,
+        onLog: false,
+        logSpeed: 0,
+      };
+
+      // Game objects
+      let cars = [];
+      let logs = [];
+      let turtles = [];
+
+      // Game zones
+      const zones = {
+        start: { y: 520, height: 80, color: "#90EE90" },
+        road: { y: 280, height: 240, color: "#696969" },
+        middle: { y: 240, height: 40, color: "#90EE90" },
+        river: { y: 40, height: 200, color: "#4169E1" },
+        goal: { y: 0, height: 40, color: "#FFD700" },
+      };
+
+      // Initialize game objects
+      function initializeGame() {
+        cars = [
+          // Lane 1 (bottom road)
+          { x: 0, y: 480, width: 60, height: 30, speed: 2, color: "#FF4500" },
+          { x: 200, y: 480, width: 60, height: 30, speed: 2, color: "#FF4500" },
+          { x: 400, y: 480, width: 60, height: 30, speed: 2, color: "#FF4500" },
+
+          // Lane 2
+          {
+            x: 800,
+            y: 440,
+            width: 80,
+            height: 30,
+            speed: -3,
+            color: "#DC143C",
+          },
+          {
+            x: 600,
+            y: 440,
+            width: 80,
+            height: 30,
+            speed: -3,
+            color: "#DC143C",
+          },
+          {
+            x: 300,
+            y: 440,
+            width: 80,
+            height: 30,
+            speed: -3,
+            color: "#DC143C",
+          },
+
+          // Lane 3
+          { x: 0, y: 400, width: 70, height: 30, speed: 2.5, color: "#FF1493" },
+          {
+            x: 250,
+            y: 400,
+            width: 70,
+            height: 30,
+            speed: 2.5,
+            color: "#FF1493",
+          },
+          {
+            x: 500,
+            y: 400,
+            width: 70,
+            height: 30,
+            speed: 2.5,
+            color: "#FF1493",
+          },
+
+          // Lane 4
+          {
+            x: 800,
+            y: 360,
+            width: 90,
+            height: 30,
+            speed: -2,
+            color: "#8B0000",
+          },
+          {
+            x: 500,
+            y: 360,
+            width: 90,
+            height: 30,
+            speed: -2,
+            color: "#8B0000",
+          },
+          {
+            x: 200,
+            y: 360,
+            width: 90,
+            height: 30,
+            speed: -2,
+            color: "#8B0000",
+          },
+
+          // Lane 5
+          { x: 0, y: 320, width: 75, height: 30, speed: 3, color: "#B22222" },
+          { x: 300, y: 320, width: 75, height: 30, speed: 3, color: "#B22222" },
+          { x: 600, y: 320, width: 75, height: 30, speed: 3, color: "#B22222" },
+
+          // Lane 6 (top road)
+          {
+            x: 800,
+            y: 280,
+            width: 65,
+            height: 30,
+            speed: -2.5,
+            color: "#FF6347",
+          },
+          {
+            x: 450,
+            y: 280,
+            width: 65,
+            height: 30,
+            speed: -2.5,
+            color: "#FF6347",
+          },
+          {
+            x: 100,
+            y: 280,
+            width: 65,
+            height: 30,
+            speed: -2.5,
+            color: "#FF6347",
+          },
+        ];
+
+        logs = [
+          // River lane 1 (bottom)
+          {
+            x: 0,
+            y: 200,
+            width: 120,
+            height: 25,
+            speed: 1.5,
+            color: "#8B4513",
+          },
+          {
+            x: 200,
+            y: 200,
+            width: 120,
+            height: 25,
+            speed: 1.5,
+            color: "#8B4513",
+          },
+          {
+            x: 400,
+            y: 200,
+            width: 120,
+            height: 25,
+            speed: 1.5,
+            color: "#8B4513",
+          },
+
+          // River lane 2
+          {
+            x: 800,
+            y: 160,
+            width: 100,
+            height: 25,
+            speed: -2,
+            color: "#A0522D",
+          },
+          {
+            x: 500,
+            y: 160,
+            width: 100,
+            height: 25,
+            speed: -2,
+            color: "#A0522D",
+          },
+          {
+            x: 200,
+            y: 160,
+            width: 100,
+            height: 25,
+            speed: -2,
+            color: "#A0522D",
+          },
+
+          // River lane 3
+          { x: 0, y: 120, width: 140, height: 25, speed: 1, color: "#8B4513" },
+          {
+            x: 250,
+            y: 120,
+            width: 140,
+            height: 25,
+            speed: 1,
+            color: "#8B4513",
+          },
+          {
+            x: 500,
+            y: 120,
+            width: 140,
+            height: 25,
+            speed: 1,
+            color: "#8B4513",
+          },
+
+          // River lane 4
+          {
+            x: 800,
+            y: 80,
+            width: 110,
+            height: 25,
+            speed: -1.5,
+            color: "#A0522D",
+          },
+          {
+            x: 450,
+            y: 80,
+            width: 110,
+            height: 25,
+            speed: -1.5,
+            color: "#A0522D",
+          },
+          {
+            x: 100,
+            y: 80,
+            width: 110,
+            height: 25,
+            speed: -1.5,
+            color: "#A0522D",
+          },
+
+          // River lane 5 (top)
+          { x: 0, y: 40, width: 130, height: 25, speed: 2.5, color: "#8B4513" },
+          {
+            x: 300,
+            y: 40,
+            width: 130,
+            height: 25,
+            speed: 2.5,
+            color: "#8B4513",
+          },
+          {
+            x: 600,
+            y: 40,
+            width: 130,
+            height: 25,
+            speed: 2.5,
+            color: "#8B4513",
+          },
+        ];
+
+        // Increase speed based on level
+        const speedMultiplier = 1 + (level - 1) * 0.3;
+        cars.forEach((car) => (car.speed *= speedMultiplier));
+        logs.forEach((log) => (log.speed *= speedMultiplier));
+      }
+
+      // Draw functions
+      function drawZones() {
+        // Start zone
+        ctx.fillStyle = zones.start.color;
+        ctx.fillRect(0, zones.start.y, canvas.width, zones.start.height);
+
+        // Road
+        ctx.fillStyle = zones.road.color;
+        ctx.fillRect(0, zones.road.y, canvas.width, zones.road.height);
+
+        // Road lines
+        ctx.strokeStyle = "#FFFF00";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([20, 10]);
+        for (let i = 1; i < 6; i++) {
+          const y = zones.road.y + (zones.road.height / 6) * i;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(canvas.width, y);
+          ctx.stroke();
+        }
+        ctx.setLineDash([]);
+
+        // Middle safe zone
+        ctx.fillStyle = zones.middle.color;
+        ctx.fillRect(0, zones.middle.y, canvas.width, zones.middle.height);
+
+        // River
+        ctx.fillStyle = zones.river.color;
+        ctx.fillRect(0, zones.river.y, canvas.width, zones.river.height);
+
+        // Goal zone
+        ctx.fillStyle = zones.goal.color;
+        ctx.fillRect(0, zones.goal.y, canvas.width, zones.goal.height);
+
+        // Goal text
+        ctx.fillStyle = "#000";
+        ctx.font = "bold 20px Arial";
+        ctx.textAlign = "center";
+        ctx.fillText("GOAL", canvas.width / 2, 25);
+      }
+
+      function drawPlayer() {
+        ctx.fillStyle = "#228B22";
+        ctx.fillRect(player.x, player.y, player.width, player.height);
+
+        // Frog eyes
+        ctx.fillStyle = "#000";
+        ctx.fillRect(player.x + 5, player.y + 5, 5, 5);
+        ctx.fillRect(player.x + 20, player.y + 5, 5, 5);
+
+        // Frog body details
+        ctx.fillStyle = "#32CD32";
+        ctx.fillRect(player.x + 5, player.y + 15, 20, 10);
+      }
+
+      function drawCars() {
+        cars.forEach((car) => {
+          ctx.fillStyle = car.color;
+          ctx.fillRect(car.x, car.y, car.width, car.height);
+
+          // Car details
+          ctx.fillStyle = "#000";
+          ctx.fillRect(car.x + 5, car.y + 5, car.width - 10, car.height - 10);
+
+          // Headlights/taillights
+          ctx.fillStyle = car.speed > 0 ? "#FFFF00" : "#FF0000";
+          if (car.speed > 0) {
+            ctx.fillRect(car.x + car.width - 8, car.y + 5, 5, 8);
+            ctx.fillRect(car.x + car.width - 8, car.y + car.height - 13, 5, 8);
+          } else {
+            ctx.fillRect(car.x + 3, car.y + 5, 5, 8);
+            ctx.fillRect(car.x + 3, car.y + car.height - 13, 5, 8);
+          }
+        });
+      }
+
+      function drawLogs() {
+        logs.forEach((log) => {
+          ctx.fillStyle = log.color;
+          ctx.fillRect(log.x, log.y, log.width, log.height);
+
+          // Log texture
+          ctx.strokeStyle = "#654321";
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 3; i++) {
+            const y = log.y + (log.height / 4) * (i + 1);
+            ctx.beginPath();
+            ctx.moveTo(log.x, y);
+            ctx.lineTo(log.x + log.width, y);
+            ctx.stroke();
+          }
+        });
+      }
+
+      // Update functions
+      function updateCars() {
+        cars.forEach((car) => {
+          car.x += car.speed;
+
+          // Wrap around screen
+          if (car.speed > 0 && car.x > canvas.width) {
+            car.x = -car.width;
+          } else if (car.speed < 0 && car.x + car.width < 0) {
+            car.x = canvas.width;
+          }
+        });
+      }
+
+      function updateLogs() {
+        logs.forEach((log) => {
+          log.x += log.speed;
+
+          // Wrap around screen
+          if (log.speed > 0 && log.x > canvas.width) {
+            log.x = -log.width;
+          } else if (log.speed < 0 && log.x + log.width < 0) {
+            log.x = canvas.width;
+          }
+        });
+      }
+
+      function updatePlayer() {
+        // Check if player is on a log
+        player.onLog = false;
+        player.logSpeed = 0;
+
+        if (
+          player.y >= zones.river.y &&
+          player.y < zones.river.y + zones.river.height
+        ) {
+          logs.forEach((log) => {
+            if (
+              player.x < log.x + log.width &&
+              player.x + player.width > log.x &&
+              player.y < log.y + log.height &&
+              player.y + player.height > log.y
+            ) {
+              player.onLog = true;
+              player.logSpeed = log.speed;
+            }
+          });
+
+          // If in river but not on log, player drowns
+          if (!player.onLog) {
+            loseLife();
+            return;
+          }
+        }
+
+        // Move with log if on one
+        if (player.onLog) {
+          player.x += player.logSpeed;
+
+          // Keep player on screen
+          if (player.x < 0) player.x = 0;
+          if (player.x + player.width > canvas.width)
+            player.x = canvas.width - player.width;
+        }
+      }
+
+      // Collision detection
+      function checkCollisions() {
+        // Check car collisions
+        cars.forEach((car) => {
+          if (
+            player.x < car.x + car.width &&
+            player.x + player.width > car.x &&
+            player.y < car.y + car.height &&
+            player.y + player.height > car.y
+          ) {
+            loseLife();
+          }
+        });
+
+        // Check if reached goal
+        if (player.y <= zones.goal.height) {
+          levelComplete();
+        }
+      }
+
+      // Game state functions
+      function loseLife() {
+        lives--;
+        updateUI();
+
+        if (lives <= 0) {
+          gameOver();
+        } else {
+          resetPlayerPosition();
+        }
+      }
+
+      function resetPlayerPosition() {
+        player.x = 375;
+        player.y = 550;
+        player.onLog = false;
+        player.logSpeed = 0;
+      }
+
+      function levelComplete() {
+        score += 1000 + level * 500;
+        level++;
+        updateUI();
+
+        document.getElementById("winScore").textContent = score;
+        document.getElementById("gameWin").style.display = "block";
+        gameState = "levelComplete";
+      }
+
+      function gameOver() {
+        document.getElementById("finalScore").textContent = score;
+        document.getElementById("gameOver").style.display = "block";
+        gameState = "gameOver";
+      }
+
+      function nextLevel() {
+        document.getElementById("gameWin").style.display = "none";
+        resetPlayerPosition();
+        initializeGame();
+        gameState = "playing";
+      }
+
+      function restartGame() {
+        document.getElementById("gameOver").style.display = "none";
+        score = 0;
+        lives = 3;
+        level = 1;
+        updateUI();
+        resetPlayerPosition();
+        initializeGame();
+        gameState = "playing";
+      }
+
+      function updateUI() {
+        document.getElementById("score").textContent = score;
+        document.getElementById("lives").textContent = lives;
+        document.getElementById("level").textContent = level;
+      }
+
+      // Input handling
+      document.addEventListener("keydown", (e) => {
+        if (gameState !== "playing") return;
+
+        switch (e.key) {
+          case "ArrowUp":
+            if (player.y > 0) {
+              player.y -= player.speed;
+              score += 10;
+              updateUI();
+            }
+            break;
+          case "ArrowDown":
+            if (player.y < canvas.height - player.height) {
+              player.y += player.speed;
+            }
+            break;
+          case "ArrowLeft":
+            if (player.x > 0) {
+              player.x -= player.speed;
+            }
+            break;
+          case "ArrowRight":
+            if (player.x < canvas.width - player.width) {
+              player.x += player.speed;
+            }
+            break;
+        }
+      });
+
+      // Game loop
+      function gameLoop() {
+        if (gameState === "playing") {
+          // Clear canvas
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+          // Draw everything
+          drawZones();
+          drawLogs();
+          drawCars();
+          drawPlayer();
+
+          // Update game objects
+          updateCars();
+          updateLogs();
+          updatePlayer();
+
+          // Check collisions
+          checkCollisions();
+        }
+
+        requestAnimationFrame(gameLoop);
+      }
+
+      // Initialize and start game
+      initializeGame();
+      updateUI();
+      gameLoop();
+    </script>
+  </body>
+</html>
